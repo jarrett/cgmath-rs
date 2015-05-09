@@ -387,12 +387,37 @@ pub trait Matrix<S: BaseFloat, V: Clone + Vector<S>>: Array2<V, V, S>
     /// the identity matrix. Returns `None` if this matrix is not invertible
     /// (has a determinant of zero).
     #[must_use]
-    fn invert(&self) -> Option<Self>;
-
+    fn invert(&self) -> Option<Self> {
+        let det = self.determinant();
+        if det.approx_eq(&zero()) {
+            None
+        } else {
+            unsafe {
+                Some(self.invert_with_det(det))
+            }
+        }
+    }
+    
+    // Identical to `invert`, except it does not check whether the matrix is invertible.
+    // Thus, you are responsible for ensuring as much.
+    #[must_use]
+    unsafe fn invert_unsafe(&self) -> Self {
+        self.invert_with_det(self.determinant())
+    }
+    
+    unsafe fn invert_with_det(&self, det: S) -> Self;
+    
     /// Invert this matrix in-place.
     #[inline]
     fn invert_self(&mut self) {
         *self = self.invert().expect("Attempted to invert a matrix with zero determinant.");
+    }
+    
+    // Identical to `invert_self`, except it does not check whether the matrix is invertible.
+    // Thus, you are responsible for ensuring as much.
+    #[inline]
+    unsafe fn invert_self_unsafe(&mut self) {
+        *self = self.invert_unsafe();
     }
 
     /// Test if this matrix is invertible.
@@ -904,16 +929,11 @@ impl<S: BaseFloat> Matrix<S, Vector2<S>> for Matrix2<S> {
         Vector2::new(self[0][0],
                      self[1][1])
     }
-
+    
     #[inline]
-    fn invert(&self) -> Option<Matrix2<S>> {
-        let det = self.determinant();
-        if det.approx_eq(&zero()) {
-            None
-        } else {
-            Some(Matrix2::new( self[1][1] / det, -self[0][1] / det,
-                              -self[1][0] / det,  self[0][0] / det))
-        }
+    unsafe fn invert_with_det(&self, det: S) -> Matrix2<S> {
+        Matrix2::new( self[1][1] / det, -self[0][1] / det,
+                     -self[1][0] / det,  self[0][0] / det)
     }
 
     #[inline]
@@ -1039,14 +1059,11 @@ impl<S: BaseFloat> Matrix<S, Vector3<S>> for Matrix3<S> {
                      self[1][1],
                      self[2][2])
     }
-
-    fn invert(&self) -> Option<Matrix3<S>> {
-        let det = self.determinant();
-        if det.approx_eq(&zero()) { None } else {
-            Some(Matrix3::from_cols(self[1].cross(&self[2]).div_s(det),
-                                    self[2].cross(&self[0]).div_s(det),
-                                    self[0].cross(&self[1]).div_s(det)).transpose())
-        }
+    
+    unsafe fn invert_with_det(&self, det: S) -> Matrix3<S> {
+        Matrix3::from_cols(self[1].cross(&self[2]).div_s(det),
+                           self[2].cross(&self[0]).div_s(det),
+                           self[0].cross(&self[1]).div_s(det)).transpose()
     }
 
     fn is_diagonal(&self) -> bool {
@@ -1223,41 +1240,35 @@ impl<S: BaseFloat> Matrix<S, Vector4<S>> for Matrix4<S> {
                      self[2][2],
                      self[3][3])
     }
-
-    fn invert(&self) -> Option<Matrix4<S>> {
-        let det = self.determinant();
-        if !det.approx_eq(&zero()) {
-            let one: S = one();
-            let inv_det = one / det;
-            let t = self.transpose();
-            let cf = |i, j| {
-                let mat = match i {
-                    0 => Matrix3::from_cols(t.y.truncate_n(j),
-                                            t.z.truncate_n(j),
-                                            t.w.truncate_n(j)),
-                    1 => Matrix3::from_cols(t.x.truncate_n(j),
-                                            t.z.truncate_n(j),
-                                            t.w.truncate_n(j)),
-                    2 => Matrix3::from_cols(t.x.truncate_n(j),
-                                            t.y.truncate_n(j),
-                                            t.w.truncate_n(j)),
-                    3 => Matrix3::from_cols(t.x.truncate_n(j),
-                                            t.y.truncate_n(j),
-                                            t.z.truncate_n(j)),
-                    _ => panic!("out of range")
-                };
-                let sign = if (i+j) & 1 == 1 {-one} else {one};
-                mat.determinant() * sign * inv_det
+    
+    unsafe fn invert_with_det(&self, det: S) -> Matrix4<S> {
+        let one: S = one();
+        let inv_det = one / det;
+        let t = self.transpose();
+        let cf = |i, j| {
+            let mat = match i {
+                0 => Matrix3::from_cols(t.y.truncate_n(j),
+                                        t.z.truncate_n(j),
+                                        t.w.truncate_n(j)),
+                1 => Matrix3::from_cols(t.x.truncate_n(j),
+                                        t.z.truncate_n(j),
+                                        t.w.truncate_n(j)),
+                2 => Matrix3::from_cols(t.x.truncate_n(j),
+                                        t.y.truncate_n(j),
+                                        t.w.truncate_n(j)),
+                3 => Matrix3::from_cols(t.x.truncate_n(j),
+                                        t.y.truncate_n(j),
+                                        t.z.truncate_n(j)),
+                _ => panic!("out of range")
             };
+            let sign = if (i+j) & 1 == 1 {-one} else {one};
+            mat.determinant() * sign * inv_det
+        };
 
-            Some(Matrix4::new(cf(0, 0), cf(0, 1), cf(0, 2), cf(0, 3),
-                              cf(1, 0), cf(1, 1), cf(1, 2), cf(1, 3),
-                              cf(2, 0), cf(2, 1), cf(2, 2), cf(2, 3),
-                              cf(3, 0), cf(3, 1), cf(3, 2), cf(3, 3)))
-
-        } else {
-            None
-        }
+        Matrix4::new(cf(0, 0), cf(0, 1), cf(0, 2), cf(0, 3),
+                     cf(1, 0), cf(1, 1), cf(1, 2), cf(1, 3),
+                     cf(2, 0), cf(2, 1), cf(2, 2), cf(2, 3),
+                     cf(3, 0), cf(3, 1), cf(3, 2), cf(3, 3))
     }
 
     fn is_diagonal(&self) -> bool {
