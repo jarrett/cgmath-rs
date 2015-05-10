@@ -10,7 +10,8 @@ authors = ["Brendan Zabarauskas <bjzaba@yahoo.com.au>",
         "Luqman Aden",
         "Maik Klein",
         "Mikko Perttunen",
-        "Tomasz Stachowiak"
+        "Tomasz Stachowiak",
+        "Jarrett Colby"
 ]
 license="Apache-2.0"
 description="A linear algebra and mathematics library for computer graphics."
