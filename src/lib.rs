@@ -58,6 +58,7 @@ pub use frustum::{Frustum, FrustumPoints};
 pub use intersect::Intersect;
 pub use obb::*;
 pub use sphere::Sphere;
+pub use triangle::*;
 
 pub use approx::ApproxEq;
 pub use num::*;
@@ -89,6 +90,7 @@ mod frustum;
 mod intersect;
 mod obb;
 mod sphere;
+mod triangle;
 
 mod approx;
 mod num;
