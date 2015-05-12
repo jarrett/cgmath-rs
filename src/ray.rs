@@ -21,7 +21,7 @@ use vector::{Vector, EuclideanVector, Vector2, Vector3};
 
 /// A generic ray starting at `origin` and extending infinitely in
 /// `direction`.
-#[derive(Copy, Clone, PartialEq, RustcEncodable, RustcDecodable)]
+#[derive(Copy, Clone, PartialEq, RustcEncodable, RustcDecodable, Debug)]
 pub struct Ray<S, P, V> {
     pub origin: P,
     pub direction: V,
@@ -36,29 +36,42 @@ impl<S: BaseNum, V: Vector<S>, P: Point<S, V>> Ray<S, P, V> {
         	phantom_s: PhantomData
         }
     }
+    
+    // Like `Ray::new`, except that instead of a direction vector, this function takes a
+    // second point. (The direction vector in `Ray::new` represents displacement relative
+    // to the origin. But the second point in `Ray::from_point` is in
+    // absolute coordinates.)
+    pub fn from_points(p1: P, p2: P) -> Ray<S, P, V> {
+        let direction = p2.sub_p(&p1);
+        Ray::new(p1, direction)
+    }
 }
 
 pub type Ray2<S> = Ray<S, Point2<S>, Vector2<S>>;
 pub type Ray3<S> = Ray<S, Point3<S>, Vector3<S>>;
 
 impl<S: BaseNum> Ray3<S> {
+    // Returns the point at the given t value.
     pub fn at(&self, t: S) -> Point3<S> {
         Point3 {x: self.x(t), y: self.y(t), z: self.z(t)}
     }
     
+    // Returns the x coordinate at the given t value.
     pub fn x(&self, t: S) -> S {
         self.direction.x * t + self.origin.x
     }
     
+    // Returns the y coordinate at the given t value.
     pub fn y(&self, t: S) -> S {
         self.direction.y * t + self.origin.y
     }
     
+    // Returns the z coordinate at the given t value.
     pub fn z(&self, t: S) -> S {
         self.direction.z * t + self.origin.z
     }
     
-    // Returns a t value.
+    // Returns the t value where the x coordinate equals the given value.
     pub fn where_x_eq(&self, x: S) -> Option<S> {
         if self.direction.x == zero() {
             None
@@ -67,7 +80,7 @@ impl<S: BaseNum> Ray3<S> {
         }
     }
     
-    // Returns a t value.
+    // Returns the t value where the y coordinate equals the given value.
     pub fn where_y_eq(&self, y: S) -> Option<S> {
         if self.direction.y == zero() {
             None
@@ -76,7 +89,7 @@ impl<S: BaseNum> Ray3<S> {
         }
     }
     
-    // Returns a t value.
+    // Returns the t value where the z coordinate equals the given value.
     pub fn where_z_eq(&self, z: S) -> Option<S> {
         if self.direction.z == zero() {
             None
@@ -87,6 +100,7 @@ impl<S: BaseNum> Ray3<S> {
 }
 
 impl<S: BaseFloat, V: EuclideanVector<S>, P: Point<S, V>> Ray<S, P, V> {
+    // Normalizes this ray's  direction vector.
     pub fn normalize(&self) -> Ray<S, P, V> {
         Ray::new(self.origin.clone(), self.direction.normalize())
     } 
