@@ -22,6 +22,7 @@ use ray::Ray3;
 use intersect::Intersect;
 use approx::ApproxEq;
 
+#[derive(Copy, Clone, PartialEq, RustcEncodable, RustcDecodable, Debug)]
 pub struct Triangle<P> {
     pub p0: P,
     pub p1: P,
