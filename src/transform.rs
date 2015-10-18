@@ -15,7 +15,7 @@
 
 use std::fmt;
 
-use rust_num::{zero, one};
+use rust_num::{Zero, One};
 
 use approx::ApproxEq;
 use matrix::*;
@@ -31,7 +31,7 @@ use vector::*;
 pub trait Transform<S: BaseNum, V: Vector<S>, P: Point<S, V>>: Sized {
     /// Create an identity transformation. That is, a transformation which
     /// does nothing.
-    fn identity() -> Self;
+    fn one() -> Self;
 
     /// Create a transformation that rotates a vector to look at `center` from
     /// `eye`, using `up` for orientation.
@@ -52,7 +52,7 @@ pub trait Transform<S: BaseNum, V: Vector<S>, P: Point<S, V>>: Sized {
     /// Transform a vector as a point using this transform.
     #[inline]
     fn transform_as_point(&self, vec: &V) -> V {
-        self.transform_point(&Point::from_vec(vec)).to_vec()
+        self.transform_point(&P::from_vec(vec)).to_vec()
     }
 
     /// Combine this transform with another, yielding a new transformation
@@ -65,7 +65,7 @@ pub trait Transform<S: BaseNum, V: Vector<S>, P: Point<S, V>>: Sized {
     /// Combine this transform with another, in-place.
     #[inline]
     fn concat_self(&mut self, other: &Self) {
-        *self = Transform::concat(self, other);
+        *self = Self::concat(self, other);
     }
 
     /// Invert this transform in-place, failing if the transformation is not
@@ -92,21 +92,20 @@ impl<
     R: Rotation<S, V, P>,
 > Transform<S, V, P> for Decomposed<S, V, R> {
     #[inline]
-    fn identity() -> Decomposed<S, V, R> {
+    fn one() -> Decomposed<S, V, R> {
         Decomposed {
-            scale: one(),
-            rot: Rotation::identity(),
-            disp: zero(),
+            scale: S::one(),
+            rot: R::one(),
+            disp: V::zero(),
         }
     }
 
     #[inline]
     fn look_at(eye: &P, center: &P, up: &V) -> Decomposed<S, V, R> {
-        let origin: P = Point::origin();
-        let rot: R = Rotation::look_at(&center.sub_p(eye), up);
-        let disp: V = rot.rotate_vector(&origin.sub_p(eye));
+        let rot = R::look_at(&center.sub_p(eye), up);
+        let disp = rot.rotate_vector(&P::origin().sub_p(eye));
         Decomposed {
-            scale: one(),
+            scale: S::one(),
             rot: rot,
             disp: disp,
         }
@@ -131,10 +130,10 @@ impl<
     }
 
     fn invert(&self) -> Option<Decomposed<S, V, R>> {
-        if self.scale.approx_eq(&zero()) {
+        if self.scale.approx_eq(&S::zero()) {
             None
         } else {
-            let s = one::<S>() / self.scale;
+            let s = S::one() / self.scale;
             let r = self.rot.invert();
             let d = r.rotate_vector(&self.disp).mul_s(-s);
             Some(Decomposed {
@@ -146,8 +145,8 @@ impl<
     }
 }
 
-pub trait Transform2<S>: Transform<S, Vector2<S>, Point2<S>> + Into<Matrix3<S>> {}
-pub trait Transform3<S>: Transform<S, Vector3<S>, Point3<S>> + Into<Matrix4<S>> {}
+pub trait Transform2<S: BaseNum>: Transform<S, Vector2<S>, Point2<S>> + Into<Matrix3<S>> {}
+pub trait Transform3<S: BaseNum>: Transform<S, Vector3<S>, Point3<S>> + Into<Matrix4<S>> {}
 
 impl<
     S: BaseFloat + 'static,
@@ -156,7 +155,7 @@ impl<
     fn from(dec: Decomposed<S, Vector2<S>, R>) -> Matrix3<S> {
         let m: Matrix2<_> = dec.rot.into();
         let mut m: Matrix3<_> = m.mul_s(dec.scale).into();
-        m.z = dec.disp.extend(one());
+        m.z = dec.disp.extend(S::one());
         m
     }
 }
@@ -168,7 +167,7 @@ impl<
     fn from(dec: Decomposed<S, Vector3<S>, R>) -> Matrix4<S> {
         let m: Matrix3<_> = dec.rot.into();
         let mut m: Matrix4<_> = m.mul_s(dec.scale).into();
-        m.w = dec.disp.extend(one());
+        m.w = dec.disp.extend(S::one());
         m
     }
 }
@@ -201,8 +200,8 @@ pub struct AffineMatrix3<S> {
 
 impl<S: BaseFloat + 'static> Transform<S, Vector3<S>, Point3<S>> for AffineMatrix3<S> {
     #[inline]
-    fn identity() -> AffineMatrix3<S> {
-       AffineMatrix3 { mat: Matrix4::identity() }
+    fn one() -> AffineMatrix3<S> {
+       AffineMatrix3 { mat: Matrix4::one() }
     }
 
     #[inline]
@@ -212,7 +211,7 @@ impl<S: BaseFloat + 'static> Transform<S, Vector3<S>, Point3<S>> for AffineMatri
 
     #[inline]
     fn transform_vector(&self, vec: &Vector3<S>) -> Vector3<S> {
-        self.mat.mul_v(&vec.extend(zero())).truncate()
+        self.mat.mul_v(&vec.extend(S::zero())).truncate()
     }
 
     #[inline]
@@ -239,21 +238,21 @@ impl<S: BaseFloat + 'static> Transform3<S> for AffineMatrix3<S> {}
 
 /// A trait that allows extracting components (rotation, translation, scale)
 /// from an arbitrary transformations
-pub trait ToComponents<S: BaseNum, V: Vector<S>, P: Point<S, V>, R: Rotation<S, V, P>> {
+pub trait ToComponents<S: BaseFloat, V: Vector<S>, P: Point<S, V>, R: Rotation<S, V, P>> {
     /// Extract the (scale, rotation, translation) triple
     fn decompose(&self) -> (V, R, V);
 }
 
-pub trait ToComponents2<S, R: Rotation2<S>>:
+pub trait ToComponents2<S: BaseFloat, R: Rotation2<S>>:
     ToComponents<S, Vector2<S>, Point2<S>, R> {}
-pub trait ToComponents3<S, R: Rotation3<S>>:
+pub trait ToComponents3<S: BaseFloat, R: Rotation3<S>>:
     ToComponents<S, Vector3<S>, Point3<S>, R> {}
 
-pub trait CompositeTransform<S, V: Vector<S>, P: Point<S, V>, R: Rotation<S, V, P>>:
+pub trait CompositeTransform<S: BaseFloat, V: Vector<S>, P: Point<S, V>, R: Rotation<S, V, P>>:
     Transform<S, V, P> + ToComponents<S, V, P, R> {}
-pub trait CompositeTransform2<S, R: Rotation2<S>>:
+pub trait CompositeTransform2<S: BaseFloat, R: Rotation2<S>>:
     Transform2<S> + ToComponents2<S, R> {}
-pub trait CompositeTransform3<S, R: Rotation3<S>>:
+pub trait CompositeTransform3<S: BaseFloat, R: Rotation3<S>>:
     Transform3<S> + ToComponents3<S, R> {}
 
 impl<
@@ -263,8 +262,7 @@ impl<
     R: Rotation<S, V, P> + Clone,
 > ToComponents<S, V, P, R> for Decomposed<S, V, R> {
     fn decompose(&self) -> (V, R, V) {
-        let v: V = one();
-        (v.mul_s(self.scale), self.rot.clone(), self.disp.clone())
+        (V::one().mul_s(self.scale), self.rot.clone(), self.disp.clone())
     }
 }
 

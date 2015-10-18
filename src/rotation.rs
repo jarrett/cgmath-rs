@@ -18,7 +18,7 @@ use approx::ApproxEq;
 use matrix::Matrix;
 use matrix::Matrix2;
 use matrix::Matrix3;
-use num::{BaseNum, BaseFloat};
+use num::BaseFloat;
 use point::{Point, Point2, Point3};
 use quaternion::Quaternion;
 use ray::Ray;
@@ -26,9 +26,9 @@ use vector::{Vector, Vector2, Vector3};
 
 /// A trait for a generic rotation. A rotation is a transformation that
 /// creates a circular motion, and preserves at least one point in the space.
-pub trait Rotation<S: BaseNum, V: Vector<S>, P: Point<S, V>>: PartialEq + ApproxEq<S> + Sized {
+pub trait Rotation<S: BaseFloat, V: Vector<S>, P: Point<S, V>>: PartialEq + ApproxEq<S> + Sized {
     /// Create the identity transform (causes no transformation).
-    fn identity() -> Self;
+    fn one() -> Self;
 
     /// Create a rotation to a given direction with an 'up' vector
     fn look_at(dir: &V, up: &V) -> Self;
@@ -44,7 +44,7 @@ pub trait Rotation<S: BaseNum, V: Vector<S>, P: Point<S, V>>: PartialEq + Approx
     /// representation as a vector.
     #[inline]
     fn rotate_point(&self, point: &P) -> P {
-        Point::from_vec( &self.rotate_vector( &point.to_vec() ) )
+        P::from_vec(&self.rotate_vector(&point.to_vec()))
     }
 
     /// Rotate a ray using this rotation.
@@ -63,7 +63,7 @@ pub trait Rotation<S: BaseNum, V: Vector<S>, P: Point<S, V>>: PartialEq + Approx
     /// Modify this rotation in-place by combining it with another.
     #[inline]
     fn concat_self(&mut self, other: &Self) {
-        *self = Rotation::concat(self, other);
+        *self = Self::concat(self, other);
     }
 
     /// Invert this rotation in-place.
@@ -74,19 +74,19 @@ pub trait Rotation<S: BaseNum, V: Vector<S>, P: Point<S, V>>: PartialEq + Approx
 }
 
 /// A two-dimensional rotation.
-pub trait Rotation2<S>: Rotation<S, Vector2<S>, Point2<S>>
-                      + Into<Matrix2<S>>
-                      + Into<Basis2<S>> {
+pub trait Rotation2<S: BaseFloat>: Rotation<S, Vector2<S>, Point2<S>>
+                                 + Into<Matrix2<S>>
+                                 + Into<Basis2<S>> {
     /// Create a rotation by a given angle. Thus is a redundant case of both
     /// from_axis_angle() and from_euler() for 2D space.
     fn from_angle(theta: Rad<S>) -> Self;
 }
 
 /// A three-dimensional rotation.
-pub trait Rotation3<S: BaseNum>: Rotation<S, Vector3<S>, Point3<S>>
-                               + Into<Matrix3<S>>
-                               + Into<Basis3<S>>
-                               + Into<Quaternion<S>> {
+pub trait Rotation3<S: BaseFloat>: Rotation<S, Vector3<S>, Point3<S>>
+                                 + Into<Matrix3<S>>
+                                 + Into<Basis3<S>>
+                                 + Into<Quaternion<S>> {
     /// Create a rotation using an angle around a given axis.
     fn from_axis_angle(axis: &Vector3<S>, angle: Rad<S>) -> Self;
 
@@ -102,19 +102,19 @@ pub trait Rotation3<S: BaseNum>: Rotation<S, Vector3<S>, Point3<S>>
     /// Create a rotation from an angle around the `x` axis (pitch).
     #[inline]
     fn from_angle_x(theta: Rad<S>) -> Self {
-        Rotation3::from_axis_angle( &Vector3::unit_x(), theta )
+        Rotation3::from_axis_angle(&Vector3::unit_x(), theta)
     }
 
     /// Create a rotation from an angle around the `y` axis (yaw).
     #[inline]
     fn from_angle_y(theta: Rad<S>) -> Self {
-        Rotation3::from_axis_angle( &Vector3::unit_y(), theta )
+        Rotation3::from_axis_angle(&Vector3::unit_y(), theta)
     }
 
     /// Create a rotation from an angle around the `z` axis (roll).
     #[inline]
     fn from_angle_z(theta: Rad<S>) -> Self {
-        Rotation3::from_axis_angle( &Vector3::unit_z(), theta )
+        Rotation3::from_axis_angle(&Vector3::unit_z(), theta)
     }
 }
 
@@ -181,7 +181,7 @@ impl<S: BaseFloat> From<Basis2<S>> for Matrix2<S> {
 
 impl<S: BaseFloat + 'static> Rotation<S, Vector2<S>, Point2<S>> for Basis2<S> {
     #[inline]
-    fn identity() -> Basis2<S> { Basis2{ mat: Matrix2::identity() } }
+    fn one() -> Basis2<S> { Basis2 { mat: Matrix2::one() } }
 
     #[inline]
     fn look_at(dir: &Vector2<S>, up: &Vector2<S>) -> Basis2<S> {
@@ -190,7 +190,7 @@ impl<S: BaseFloat + 'static> Rotation<S, Vector2<S>, Point2<S>> for Basis2<S> {
 
     #[inline]
     fn between_vectors(a: &Vector2<S>, b: &Vector2<S>) -> Basis2<S> {
-        Rotation2::from_angle( acos(a.dot(b)) )
+        Rotation2::from_angle(acos(a.dot(b)) )
     }
 
     #[inline]
@@ -262,7 +262,7 @@ impl<S: BaseFloat + 'static> From<Basis3<S>> for Quaternion<S> {
 
 impl<S: BaseFloat + 'static> Rotation<S, Vector3<S>, Point3<S>> for Basis3<S> {
     #[inline]
-    fn identity() -> Basis3<S> { Basis3{ mat: Matrix3::identity() } }
+    fn one() -> Basis3<S> { Basis3 { mat: Matrix3::one() } }
 
     #[inline]
     fn look_at(dir: &Vector3<S>, up: &Vector3<S>) -> Basis3<S> {

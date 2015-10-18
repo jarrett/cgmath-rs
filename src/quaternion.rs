@@ -19,7 +19,7 @@ use std::mem;
 use std::ops::*;
 
 use rand::{Rand, Rng};
-use rust_num::{Float, one, zero};
+use rust_num::{Float, One, Zero};
 use rust_num::traits::cast;
 
 use angle::{Angle, Rad, acos, sin, sin_cos, rad};
@@ -35,36 +35,12 @@ use vector::{Vector3, Vector, EuclideanVector};
 /// A [quaternion](https://en.wikipedia.org/wiki/Quaternion) in scalar/vector
 /// form.
 #[derive(Copy, Clone, PartialEq, RustcEncodable, RustcDecodable)]
-pub struct Quaternion<S> { pub s: S, pub v: Vector3<S> }
-
-impl<S: Copy + BaseFloat> Array1<S> for Quaternion<S> {
-    #[inline]
-    fn map<F>(&mut self, mut op: F) -> Quaternion<S> where F: FnMut(S) -> S {
-        self.s = op(self.s);
-        self.v.x = op(self.v.x);
-        self.v.y = op(self.v.y);
-        self.v.z = op(self.v.z);
-        *self
-    }
+pub struct Quaternion<S> {
+    pub s: S,
+    pub v: Vector3<S>,
 }
 
-impl<S: BaseFloat> Index<usize> for Quaternion<S> {
-    type Output = S;
-
-    #[inline]
-    fn index<'a>(&'a self, i: usize) -> &'a S {
-        let slice: &[S; 4] = unsafe { mem::transmute(self) };
-        &slice[i]
-    }
-}
-
-impl<S: BaseFloat> IndexMut<usize> for Quaternion<S> {
-    #[inline]
-    fn index_mut<'a>(&'a mut self, i: usize) -> &'a mut S {
-        let slice: &'a mut [S; 4] = unsafe { mem::transmute(self) };
-        &mut slice[i]
-    }
-}
+impl<S: Copy + BaseFloat> Array1<S> for Quaternion<S> {}
 
 impl<S: BaseFloat> Quaternion<S> {
     /// Construct a new quaternion from one scalar component and three
@@ -83,87 +59,13 @@ impl<S: BaseFloat> Quaternion<S> {
     /// The additive identity, ie: `q = 0 + 0i + 0j + 0i`
     #[inline]
     pub fn zero() -> Quaternion<S> {
-        Quaternion::new(zero(), zero(), zero(), zero())
+        Quaternion::new(S::zero(), S::zero(), S::zero(), S::zero())
     }
 
     /// The multiplicative identity, ie: `q = 1 + 0i + 0j + 0i`
     #[inline]
-    pub fn identity() -> Quaternion<S> {
-        Quaternion::from_sv(one::<S>(), zero())
-    }
-
-    /// The result of multiplying the quaternion a scalar
-    #[inline]
-    pub fn mul_s(&self, value: S) -> Quaternion<S> {
-        Quaternion::from_sv(self.s * value, self.v.mul_s(value))
-    }
-
-    /// The result of dividing the quaternion a scalar
-    #[inline]
-    pub fn div_s(&self, value: S) -> Quaternion<S> {
-        Quaternion::from_sv(self.s / value, self.v.div_s(value))
-    }
-
-    /// The result of multiplying the quaternion by a vector
-    #[inline]
-    pub fn mul_v(&self, vec: &Vector3<S>) -> Vector3<S>  {
-        let tmp = self.v.cross(vec).add_v(&vec.mul_s(self.s.clone()));
-        self.v.cross(&tmp).mul_s(cast(2i8).unwrap()).add_v(vec)
-    }
-
-    /// The sum of this quaternion and `other`
-    #[inline]
-    pub fn add_q(&self, other: &Quaternion<S>) -> Quaternion<S> {
-        Quaternion::from_sv(self.s + other.s, self.v + other.v)
-    }
-
-    /// The difference between this quaternion and `other`
-    #[inline]
-    pub fn sub_q(&self, other: &Quaternion<S>) -> Quaternion<S> {
-        Quaternion::from_sv(self.s - other.s, self.v - other.v)
-    }
-
-    /// The result of multipliplying the quaternion by `other`
-    pub fn mul_q(&self, other: &Quaternion<S>) -> Quaternion<S> {
-        Quaternion::new(self.s * other.s - self.v.x * other.v.x - self.v.y * other.v.y - self.v.z * other.v.z,
-                        self.s * other.v.x + self.v.x * other.s + self.v.y * other.v.z - self.v.z * other.v.y,
-                        self.s * other.v.y + self.v.y * other.s + self.v.z * other.v.x - self.v.x * other.v.z,
-                        self.s * other.v.z + self.v.z * other.s + self.v.x * other.v.y - self.v.y * other.v.x)
-    }
-
-    /// Multiply this quaternion by a scalar, in-place.
-    #[inline]
-    pub fn mul_self_s(&mut self, s: S) {
-        self.s = self.s * s;
-        self.v.mul_self_s(s);
-    }
-
-    /// Divide this quaternion by a scalar, in-place.
-    #[inline]
-    pub fn div_self_s(&mut self, s: S) {
-        self.s = self.s / s;
-        self.v.div_self_s(s);
-    }
-
-    /// Add this quaternion by another, in-place.
-    #[inline]
-    pub fn add_self_q(&mut self, q: &Quaternion<S>) {
-        self.s = self.s + q.s;
-        self.v.add_self_v(&q.v);
-    }
-
-    /// Subtract another quaternion from this one, in-place.
-    #[inline]
-    pub fn sub_self_q(&mut self, q: &Quaternion<S>) {
-        self.s = self.s - q.s;
-        self.v.sub_self_v(&q.v);
-    }
-
-    /// Multiply this quaternion by another, in-place.
-    #[inline]
-    pub fn mul_self_q(&mut self, q: &Quaternion<S>) {
-        self.s = self.s * q.s;
-        self.v.mul_self_v(&q.v);
+    pub fn one() -> Quaternion<S> {
+        Quaternion::from_sv(S::one(), Vector3::zero())
     }
 
     /// The dot product of the quaternion and `q`.
@@ -201,12 +103,70 @@ impl<S: BaseFloat> Quaternion<S> {
     /// Normalize this quaternion, returning the new quaternion.
     #[inline]
     pub fn normalize(&self) -> Quaternion<S> {
-        self.mul_s(one::<S>() / self.magnitude())
+        self * (S::one() / self.magnitude())
     }
 
     /// Do a normalized linear interpolation with `other`, by `amount`.
     pub fn nlerp(&self, other: &Quaternion<S>, amount: S) -> Quaternion<S> {
-        self.mul_s(one::<S>() - amount).add_q(&other.mul_s(amount)).normalize()
+        (&(self * (S::one() - amount)) + &(other * amount)).normalize()
+    }
+}
+
+impl<'a, S: BaseFloat> Mul<S> for &'a Quaternion<S> {
+    type Output = Quaternion<S>;
+
+    #[inline]
+    fn mul(self, value: S) -> Quaternion<S> {
+        Quaternion::from_sv(self.s * value, &self.v * value)
+    }
+}
+
+impl<'a, S: BaseFloat> Div<S> for &'a Quaternion<S> {
+    type Output = Quaternion<S>;
+
+    #[inline]
+    fn div(self, value: S) -> Quaternion<S> {
+        Quaternion::from_sv(self.s / value, &self.v / value)
+    }
+}
+
+impl<'a, 'b, S: BaseFloat> Mul<&'b Vector3<S>> for &'a Quaternion<S> {
+    type Output = Vector3<S>;
+
+    #[inline]
+    fn mul(self, vec: &'b Vector3<S>) -> Vector3<S>  {
+        let tmp = self.v.cross(vec).add_v(&vec.mul_s(self.s.clone()));
+        self.v.cross(&tmp).mul_s(cast(2i8).unwrap()).add_v(vec)
+    }
+}
+
+impl<'a, 'b, S: BaseFloat> Add<&'b Quaternion<S>> for &'a Quaternion<S> {
+    type Output = Quaternion<S>;
+
+    #[inline]
+    fn add(self, other: &'b Quaternion<S>) -> Quaternion<S> {
+        Quaternion::from_sv(self.s + other.s, &self.v + &other.v)
+    }
+}
+
+impl<'a, 'b, S: BaseFloat> Sub<&'b Quaternion<S>> for &'a Quaternion<S> {
+    type Output = Quaternion<S>;
+
+    #[inline]
+    fn sub(self, other: &'b Quaternion<S>) -> Quaternion<S> {
+        Quaternion::from_sv(self.s - other.s, &self.v - &other.v)
+    }
+}
+
+impl<'a, 'b, S: BaseFloat> Mul<&'b Quaternion<S>> for &'a Quaternion<S> {
+    type Output = Quaternion<S>;
+
+    #[inline]
+    fn mul(self, other: &'b Quaternion<S>) -> Quaternion<S>  {
+        Quaternion::new(self.s * other.s - self.v.x * other.v.x - self.v.y * other.v.y - self.v.z * other.v.z,
+                        self.s * other.v.x + self.v.x * other.s + self.v.y * other.v.z - self.v.z * other.v.y,
+                        self.s * other.v.y + self.v.y * other.s + self.v.z * other.v.x - self.v.x * other.v.z,
+                        self.s * other.v.z + self.v.z * other.s + self.v.x * other.v.y - self.v.y * other.v.x)
     }
 }
 
@@ -245,22 +205,20 @@ impl<S: BaseFloat> Quaternion<S> {
         } else {
             // stay within the domain of acos()
             // TODO REMOVE WHEN https://github.com/mozilla/rust/issues/12068 IS RESOLVED
-            let robust_dot = if dot > one::<S>() {
-                one::<S>()
-            } else if dot < -one::<S>() {
-                -one::<S>()
+            let robust_dot = if dot > S::one() {
+                S::one()
+            } else if dot < -S::one() {
+                -S::one()
             } else {
                 dot
             };
 
             let theta: Rad<S> = acos(robust_dot.clone());
 
-            let scale1 = sin(theta.mul_s(one::<S>() - amount));
+            let scale1 = sin(theta.mul_s(S::one() - amount));
             let scale2 = sin(theta.mul_s(amount));
 
-            self.mul_s(scale1)
-                .add_q(&other.mul_s(scale2))
-                .mul_s(sin(theta).recip())
+            &(&(self * scale1) + &(other * scale2)) * sin(theta).recip()
         }
     }
 
@@ -276,29 +234,29 @@ impl<S: BaseFloat> Quaternion<S> {
         let one: S = cast(1f64).unwrap();
 
         let (qw, qx, qy, qz) = (self.s, self.v.x, self.v.y, self.v.z);
-        let (sqw, sqx, sqy, sqz) = (qw*qw, qx*qx, qy*qy, qz*qz);
+        let (sqw, sqx, sqy, sqz) = (qw * qw, qx * qx, qy * qy, qz * qz);
 
         let unit = sqx + sqy + sqz + sqw;
-        let test = qx*qy + qz*qw;
+        let test = qx * qy + qz * qw;
 
         if test > sig * unit {
             (
-                rad(zero::<S>()),
+                rad(S::zero()),
                 rad(cast(f64::consts::FRAC_PI_2).unwrap()),
                 rad(two * qx.atan2(qw)),
             )
         } else if test < -sig * unit {
             let y: S = cast(f64::consts::FRAC_PI_2).unwrap();
             (
-                rad(zero::<S>()),
+                rad(S::zero()),
                 rad(-y),
                 rad(two * qx.atan2(qw)),
             )
         } else {
             (
-                rad((two * (qy*qw - qx*qz)).atan2(one - two*(sqy + sqz))),
-                rad((two * (qx*qy + qz*qw)).asin()),
-                rad((two * (qx*qw - qy*qz)).atan2(one - two*(sqx + sqz))),
+                rad((two * (qy * qw - qx * qz)).atan2(one - two * (sqy + sqz))),
+                rad((two * (qx * qy + qz * qw)).asin()),
+                rad((two * (qx * qw - qy * qz)).atan2(one - two * (sqx + sqz))),
             )
         }
     }
@@ -323,9 +281,9 @@ impl<S: BaseFloat> From<Quaternion<S>> for Matrix3<S> {
         let sz2 = z2 * quat.s;
         let sx2 = x2 * quat.s;
 
-        Matrix3::new(one::<S>() - yy2 - zz2, xy2 + sz2, xz2 - sy2,
-                     xy2 - sz2, one::<S>() - xx2 - zz2, yz2 + sx2,
-                     xz2 + sy2, yz2 - sx2, one::<S>() - xx2 - yy2)
+        Matrix3::new(S::one() - yy2 - zz2, xy2 + sz2, xz2 - sy2,
+                     xy2 - sz2, S::one() - xx2 - zz2, yz2 + sx2,
+                     xz2 + sy2, yz2 - sx2, S::one() - xx2 - yy2)
     }
 }
 
@@ -348,10 +306,10 @@ impl<S: BaseFloat> From<Quaternion<S>> for Matrix4<S> {
         let sz2 = z2 * quat.s;
         let sx2 = x2 * quat.s;
 
-        Matrix4::new(one::<S>() - yy2 - zz2, xy2 + sz2, xz2 - sy2, zero::<S>(),
-                     xy2 - sz2, one::<S>() - xx2 - zz2, yz2 + sx2, zero::<S>(),
-                     xz2 + sy2, yz2 - sx2, one::<S>() - xx2 - yy2, zero::<S>(),
-                     zero::<S>(), zero::<S>(), zero::<S>(), one::<S>())
+        Matrix4::new(S::one() - yy2 - zz2, xy2 + sz2, xz2 - sy2, S::zero(),
+                     xy2 - sz2, S::one() - xx2 - zz2, yz2 + sx2, S::zero(),
+                     xz2 + sy2, yz2 - sx2, S::one() - xx2 - yy2, S::zero(),
+                     S::zero(), S::zero(), S::zero(), S::one())
     }
 }
 
@@ -383,7 +341,7 @@ impl<S: BaseFloat> From<Quaternion<S>> for Basis3<S> {
 
 impl<S: BaseFloat + 'static> Rotation<S, Vector3<S>, Point3<S>> for Quaternion<S> {
     #[inline]
-    fn identity() -> Quaternion<S> { Quaternion::identity() }
+    fn one() -> Quaternion<S> { Quaternion::one() }
 
     #[inline]
     fn look_at(dir: &Vector3<S>, up: &Vector3<S>) -> Quaternion<S> {
@@ -394,20 +352,20 @@ impl<S: BaseFloat + 'static> Rotation<S, Vector3<S>, Point3<S>> for Quaternion<S
     fn between_vectors(a: &Vector3<S>, b: &Vector3<S>) -> Quaternion<S> {
         //http://stackoverflow.com/questions/1171849/
         //finding-quaternion-representing-the-rotation-from-one-vector-to-another
-        Quaternion::from_sv(one::<S>() + a.dot(b), a.cross(b)).normalize()
+        Quaternion::from_sv(S::one() + a.dot(b), a.cross(b)).normalize()
     }
 
     #[inline]
-    fn rotate_vector(&self, vec: &Vector3<S>) -> Vector3<S> { self.mul_v(vec) }
+    fn rotate_vector(&self, vec: &Vector3<S>) -> Vector3<S> { self * vec }
 
     #[inline]
-    fn concat(&self, other: &Quaternion<S>) -> Quaternion<S> { self.mul_q(other) }
+    fn concat(&self, other: &Quaternion<S>) -> Quaternion<S> { self * other }
 
     #[inline]
-    fn concat_self(&mut self, other: &Quaternion<S>) { self.mul_self_q(other); }
+    fn concat_self(&mut self, other: &Quaternion<S>) { *self = &*self * other; }
 
     #[inline]
-    fn invert(&self) -> Quaternion<S> { self.conjugate().div_s(self.magnitude2()) }
+    fn invert(&self) -> Quaternion<S> { &self.conjugate() / self.magnitude2() }
 
     #[inline]
     fn invert_self(&mut self) { *self = self.invert() }
@@ -434,9 +392,195 @@ impl<S: BaseFloat> Rotation3<S> for Quaternion<S> where S: 'static {
     }
 }
 
+impl<S: BaseFloat> Into<[S; 4]> for Quaternion<S> {
+    #[inline]
+    fn into(self) -> [S; 4] {
+        match self.into() { (w, xi, yj, zk) => [w, xi, yj, zk] }
+    }
+}
+
+impl<S: BaseFloat> AsRef<[S; 4]> for Quaternion<S> {
+    #[inline]
+    fn as_ref(&self) -> &[S; 4] {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<S: BaseFloat> AsMut<[S; 4]> for Quaternion<S> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [S; 4] {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<S: BaseFloat> From<[S; 4]> for Quaternion<S> {
+    #[inline]
+    fn from(v: [S; 4]) -> Quaternion<S> {
+        Quaternion::new(v[0], v[1], v[2], v[3])
+    }
+}
+
+impl<'a, S: BaseFloat> From<&'a [S; 4]> for &'a Quaternion<S> {
+    #[inline]
+    fn from(v: &'a [S; 4]) -> &'a Quaternion<S> {
+        unsafe { mem::transmute(v) }
+    }
+}
+
+impl<'a, S: BaseFloat> From<&'a mut [S; 4]> for &'a mut Quaternion<S> {
+    #[inline]
+    fn from(v: &'a mut [S; 4]) -> &'a mut Quaternion<S> {
+        unsafe { mem::transmute(v) }
+    }
+}
+
+impl<S: BaseFloat> Into<(S, S, S, S)> for Quaternion<S> {
+    #[inline]
+    fn into(self) -> (S, S, S, S) {
+        match self { Quaternion { s, v: Vector3 { x, y, z } } => (s, x, y, z) }
+    }
+}
+
+impl<S: BaseFloat> AsRef<(S, S, S, S)> for Quaternion<S> {
+    #[inline]
+    fn as_ref(&self) -> &(S, S, S, S) {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<S: BaseFloat> AsMut<(S, S, S, S)> for Quaternion<S> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut (S, S, S, S) {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl<S: BaseFloat> From<(S, S, S, S)> for Quaternion<S> {
+    #[inline]
+    fn from(v: (S, S, S, S)) -> Quaternion<S> {
+        match v { (w, xi, yj, zk) => Quaternion::new(w, xi, yj, zk) }
+    }
+}
+
+impl<'a, S: BaseFloat> From<&'a (S, S, S, S)> for &'a Quaternion<S> {
+    #[inline]
+    fn from(v: &'a (S, S, S, S)) -> &'a Quaternion<S> {
+        unsafe { mem::transmute(v) }
+    }
+}
+
+impl<'a, S: BaseFloat> From<&'a mut (S, S, S, S)> for &'a mut Quaternion<S> {
+    #[inline]
+    fn from(v: &'a mut (S, S, S, S)) -> &'a mut Quaternion<S> {
+        unsafe { mem::transmute(v) }
+    }
+}
+
+macro_rules! index_operators {
+    ($S:ident, $Output:ty, $I:ty) => {
+        impl<$S: BaseFloat> Index<$I> for Quaternion<$S> {
+            type Output = $Output;
+
+            #[inline]
+            fn index<'a>(&'a self, i: $I) -> &'a $Output {
+                let v: &[$S; 4] = self.as_ref(); &v[i]
+            }
+        }
+
+        impl<$S: BaseFloat> IndexMut<$I> for Quaternion<$S> {
+            #[inline]
+            fn index_mut<'a>(&'a mut self, i: $I) -> &'a mut $Output {
+                let v: &mut [$S; 4] = self.as_mut(); &mut v[i]
+            }
+        }
+    }
+}
+
+index_operators!(S, S, usize);
+index_operators!(S, [S], Range<usize>);
+index_operators!(S, [S], RangeTo<usize>);
+index_operators!(S, [S], RangeFrom<usize>);
+index_operators!(S, [S], RangeFull);
+
 impl<S: BaseFloat + Rand> Rand for Quaternion<S> {
     #[inline]
     fn rand<R: Rng>(rng: &mut R) -> Quaternion<S> {
        Quaternion::from_sv(rng.gen(), rng.gen())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quaternion::*;
+    use vector::*;
+
+    const QUATERNION: Quaternion<f32> = Quaternion {
+        s: 1.0,
+        v: Vector3 { x: 2.0, y: 3.0, z: 4.0 },
+    };
+
+    #[test]
+    fn test_into() {
+        let v = QUATERNION;
+        {
+            let v: [f32; 4] = v.into();
+            assert_eq!(v, [1.0, 2.0, 3.0, 4.0]);
+        }
+        {
+            let v: (f32, f32, f32, f32) = v.into();
+            assert_eq!(v, (1.0, 2.0, 3.0, 4.0));
+        }
+    }
+
+    #[test]
+    fn test_as_ref() {
+        let v = QUATERNION;
+        {
+            let v: &[f32; 4] = v.as_ref();
+            assert_eq!(v, &[1.0, 2.0, 3.0, 4.0]);
+        }
+        {
+            let v: &(f32, f32, f32, f32) = v.as_ref();
+            assert_eq!(v, &(1.0, 2.0, 3.0, 4.0));
+        }
+    }
+
+    #[test]
+    fn test_as_mut() {
+        let mut v = QUATERNION;
+        {
+            let v: &mut[f32; 4] = v.as_mut();
+            assert_eq!(v, &mut [1.0, 2.0, 3.0, 4.0]);
+        }
+        {
+            let v: &mut(f32, f32, f32, f32) = v.as_mut();
+            assert_eq!(v, &mut (1.0, 2.0, 3.0, 4.0));
+        }
+    }
+
+    #[test]
+    fn test_from() {
+        assert_eq!(Quaternion::from([1.0, 2.0, 3.0, 4.0]), QUATERNION);
+        {
+            let v = &[1.0, 2.0, 3.0, 4.0];
+            let v: &Quaternion<_> = From::from(v);
+            assert_eq!(v, &QUATERNION);
+        }
+        {
+            let v = &mut [1.0, 2.0, 3.0, 4.0];
+            let v: &mut Quaternion<_> = From::from(v);
+            assert_eq!(v, &QUATERNION);
+        }
+        assert_eq!(Quaternion::from((1.0, 2.0, 3.0, 4.0)), QUATERNION);
+        {
+            let v = &(1.0, 2.0, 3.0, 4.0);
+            let v: &Quaternion<_> = From::from(v);
+            assert_eq!(v, &QUATERNION);
+        }
+        {
+            let v = &mut (1.0, 2.0, 3.0, 4.0);
+            let v: &mut Quaternion<_> = From::from(v);
+            assert_eq!(v, &QUATERNION);
+        }
     }
 }
